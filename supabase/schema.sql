@@ -55,6 +55,18 @@ create policy "anon read status"   on box_status for select to anon using (true)
 create policy "anon write status"  on box_status for insert to anon with check (true);
 create policy "anon update status" on box_status for update to anon using (true) with check (true);
 
+grant select, insert on trips to anon;
+grant select, insert, update on box_status to anon;
+
 -- Live updates for the results app.
-alter publication supabase_realtime add table trips;
-alter publication supabase_realtime add table box_status;
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and tablename = 'trips') then
+    alter publication supabase_realtime add table trips;
+  end if;
+  if not exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and tablename = 'box_status') then
+    alter publication supabase_realtime add table box_status;
+  end if;
+end $$;

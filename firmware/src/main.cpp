@@ -277,7 +277,11 @@ static bool postJson(WiFiClientSecure &tls, const String &path, const String &bo
     return false;
   }
   http.addHeader("apikey", SUPABASE_ANON_KEY);
-  http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  // Legacy anon keys are JWTs ("eyJ...") and also go in the Authorization
+  // header. New publishable keys (sb_publishable_...) must only go in apikey.
+  if (strncmp(SUPABASE_ANON_KEY, "eyJ", 3) == 0) {
+    http.addHeader("Authorization", String("Bearer ") + SUPABASE_ANON_KEY);
+  }
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Prefer", prefer);
   code = http.POST(body);

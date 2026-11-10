@@ -9,6 +9,8 @@
 #define WIFI_SSID_2     "Finish Phone"
 #define WIFI_PASS_2     "changeme"
 
-// Supabase project: Settings > API in the Supabase dashboard.
+// Supabase project: Project Settings > API Keys in the dashboard.
+// Use the publishable key (sb_publishable_...). A legacy anon key (eyJ...)
+// also works. Never put the secret key here.
 #define SUPABASE_URL      "https://YOUR-PROJECT.supabase.co"
-#define SUPABASE_ANON_KEY "YOUR-ANON-KEY"
+#define SUPABASE_ANON_KEY "sb_publishable_YOUR-KEY"

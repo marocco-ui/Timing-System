@@ -6,7 +6,7 @@ Two boxes time a run from a beam at the start to a beam at the finish. Each box 
 platformio.ini  build settings for both boxes
 firmware/    ESP32 code for both boxes (PlatformIO, VS Code)
 supabase/    database tables (schema.sql)
-app/         results web app (coming next)
+app/         results web app (index.html, runs on any phone)
 ```
 
 ## Hardware per box
@@ -38,12 +38,42 @@ app/         results web app (coming next)
 
 Check the sensor's wire colors against its own label. Never put 12 V on a XIAO pin. Set the boost to 12 V with a multimeter before you connect the sensor.
 
+## Results app
+
+`app/index.html` is the whole app: one file, no install. It works on iPhone and Android.
+
+| Tab | Who uses it | What it does |
+|---|---|---|
+| Start | Starter | Type a bib, tap Arm, send the rider. Shows who's on course with a running clock. |
+| Results | Anyone | Times sorted fastest first, best run per rider or all runs. CSV export. |
+| Fix | Finish volunteer | Attach beam trips nobody claimed, swap finishes if a rider got passed, mark DNF. |
+| Setup | Once per phone | Supabase URL and publishable key, or a share link that fills them in. |
+
+Pairing happens in the database (`002_runs.sql`), so it works even if nobody has the app open:
+
+1. Arming a bib adds a run.
+2. The next start beam trip goes to the oldest armed run.
+3. The next finish beam trip goes to the rider who started earliest and is still on course.
+
+If a rider passes another, the finish volunteer taps the result and swaps the two finish times.
+
+**Try it without hardware:** open the app and tap **Try demo** in Setup. The Fix tab gets buttons that fake beam trips.
+
+### Hosting it (free, GitHub Pages)
+
+1. On GitHub: repo **Settings > Pages**. Under Branch pick `main` and `/ (root)`, then Save.
+2. After a minute the app is at `https://marocco-ui.github.io/Timing-System/app/`.
+3. Open it, enter the Supabase URL and publishable key in Setup, then copy the share link from Setup and send it to the crew.
+
+The publishable key is meant to be public, so it's fine in the share link. The repo never stores it.
+
 ## One-time setup
 
 1. Install [VS Code](https://code.visualstudio.com/) and the **PlatformIO IDE** extension.
 2. In VS Code: File > Open Folder > `Timing System` (the top folder, where `platformio.ini` is). PlatformIO downloads the ESP32 tools the first time (a few minutes).
 3. Copy `firmware/include/secrets.example.h` to `firmware/include/secrets.h`. Fill in both phone hotspot names and passwords, plus the Supabase URL and anon key.
-4. Make a free project at [supabase.com](https://supabase.com). Open SQL Editor, paste `supabase/schema.sql`, and run it.
+4. Make a free project at [supabase.com](https://supabase.com). In SQL Editor, run `supabase/schema.sql`, then `supabase/002_runs.sql`. Both are safe to run again.
+5. Use the **publishable key** (`sb_publishable_...`) from Project Settings > API Keys. Never use the secret key.
 
 Free Supabase projects pause after a week with no activity. Open the dashboard the day before a ride so it's awake.
 

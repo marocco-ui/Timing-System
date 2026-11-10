@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111418">
+<title>Race Timing</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #15181d; --muted: #66707d; --line: #e2e5ea;
+    --accent: #1f6feb; --good: #1a7f37; --warn: #b7791f; --bad: #c62828; --chip: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111418; --card: #1a1e24; --text: #e8ebef; --muted: #98a2b0; --line: #2b313a;
+            --accent: #4c8dff; --good: #3fb950; --warn: #d4a72c; --bad: #f85149; --chip: #242a33; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); padding-bottom: 76px; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
+           padding: 10px 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0 auto 0 0; }
+  .pill { font-size: 13px; padding: 3px 9px; border-radius: 99px; background: var(--chip); white-space: nowrap; }
+  .pill::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                  margin-right: 6px; background: var(--muted); vertical-align: 1px; }
+  .pill.good::before { background: var(--good); } .pill.warn::before { background: var(--warn); }
+  .pill.bad::before { background: var(--bad); }
+  main { max-width: 640px; margin: 0 auto; padding: 12px; }
+  section { display: none; } section.active { display: block; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .card h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  input, select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+                  border-radius: 10px; padding: 10px 12px; width: 100%; }
+  input.big { font-size: 28px; font-weight: 600; text-align: center; padding: 12px; }
+  button { font: inherit; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer;
+           background: var(--chip); color: var(--text); white-space: nowrap; }
+  button.primary { background: var(--accent); color: #fff; font-weight: 600; }
+  button.big { font-size: 20px; padding: 14px 22px; }
+  button.danger { color: var(--bad); }
+  button.small { padding: 6px 10px; font-size: 14px; }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+  ul.list li:first-child { border-top: 0; }
+  .bib { font-weight: 700; font-size: 20px; min-width: 52px; }
+  .grow { flex: 1; min-width: 0; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .time { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .empty { color: var(--muted); font-size: 14px; padding: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 9px 6px; border-top: 1px solid var(--line); }
+  th { font-size: 13px; color: var(--muted); font-weight: 600; border-top: 0; }
+  td.num { text-align: right; } th.num { text-align: right; }
+  .flag { color: var(--warn); font-size: 13px; }
+  .seg { display: flex; background: var(--chip); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button { flex: 1; background: transparent; padding: 7px; font-size: 14px; }
+  .seg button.on { background: var(--card); font-weight: 600; }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: var(--card);
+        border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+  nav button { flex: 1; background: transparent; border-radius: 0; padding: 14px 4px; font-size: 15px; color: var(--muted); }
+  nav button.on { color: var(--accent); font-weight: 700; }
+  .banner { background: var(--warn); color: #111; padding: 8px 14px; font-size: 14px; text-align: center; }
+  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text);
+           width: min(92vw, 420px); padding: 16px; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .stack > * + * { margin-top: 8px; }
+  .toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: var(--text);
+           color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0;
+           transition: opacity .2s; pointer-events: none; z-index: 10; }
+  .toast.show { opacity: 1; }
+  code { display: block; background: var(--chip); padding: 8px 10px; border-radius: 8px; font-size: 13px; word-break: break-all; }
+</style>
+</head>
+<body>
+<div id="demoBanner" class="banner" hidden>Demo mode: fake data, nothing is saved. Turn it off in Setup.</div>
+<header>
+  <h1>Race Timing</h1>
+  <span id="pillStart" class="pill">Start box</span>
+  <span id="pillFinish" class="pill">Finish box</span>
+</header>
+
+<main>
+  <!-- START -------------------------------------------------------------- -->
+  <section id="tab-start" class="active">
+    <div class="card">
+      <h2>Next rider</h2>
+      <form id="armForm" class="row" autocomplete="off">
+        <input id="bibInput" class="big" inputmode="numeric" placeholder="Bib #" maxlength="8" required>
+        <button class="primary big" type="submit">Arm</button>
+      </form>
+      <p class="muted" style="margin:8px 0 0">Arm the bib, then send the rider. The next beam trip at the start is theirs.</p>
+    </div>
+    <div class="card">
+      <h2>Waiting to start</h2>
+      <ul id="armedList" class="list"></ul>
+    </div>
+    <div class="card">
+      <h2>On course</h2>
+      <ul id="courseList" class="list"></ul>
+    </div>
+    <div class="card">
+      <h2>Just finished</h2>
+      <ul id="recentList" class="list"></ul>
+    </div>
+  </section>
+
+  <!-- RESULTS ------------------------------------------------------------ -->
+  <section id="tab-results">
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <div class="seg grow">
+          <button id="viewBest" class="on" type="button">Best per rider</button>
+          <button id="viewAll" type="button">All runs</button>
+        </div>
+        <button id="exportCsv" class="small" type="button">CSV</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Bib</th><th class="num">Time</th><th></th></tr></thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+      <p class="muted" style="margin:10px 0 0">Tap a row to fix it. <span class="flag">GPS?</span> means a box wasn't GPS-locked for that run.</p>
+    </div>
+  </section>
+
+  <!-- FIX ------------------------------------------------------------------ -->
+  <section id="tab-fix">
+    <div class="card">
+      <h2>Unclaimed beam trips</h2>
+      <ul id="unassignedList" class="list"></ul>
+      <p class="muted" style="margin:8px 0 0">A trip shows here when nobody was armed (start) or nobody was on course (finish). Attach it to the right bib, or leave it if it was a hand or a dog.</p>
+    </div>
+    <div id="demoCard" class="card" hidden>
+      <h2>Demo controls</h2>
+      <div class="row">
+        <button id="fakeStart" type="button" class="grow">Break start beam</button>
+        <button id="fakeFinish" type="button" class="grow">Break finish beam</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETUP ---------------------------------------------------------------- -->
+  <section id="tab-setup">
+    <div class="card stack">
+      <h2>Connection</h2>
+      <label class="muted" for="cfgUrl">Supabase project URL</label>
+      <input id="cfgUrl" placeholder="https://xxxx.supabase.co" autocomplete="off">
+      <label class="muted" for="cfgKey">Publishable key</label>
+      <input id="cfgKey" placeholder="sb_publishable_..." autocomplete="off">
+      <div class="row">
+        <button id="saveCfg" class="primary grow" type="button">Save and connect</button>
+        <button id="demoBtn" type="button">Try demo</button>
+      </div>
+      <p class="muted">Never paste the secret key here.</p>
+    </div>
+    <div class="card stack">
+      <h2>Share with the crew</h2>
+      <p class="muted" style="margin:0">Send this link to the starter and finish volunteer. Opening it sets up their phone.</p>
+      <code id="shareLink">Save a connection first.</code>
+      <button id="copyLink" type="button">Copy link</button>
+    </div>
+    <div class="card stack">
+      <h2>Show runs from</h2>
+      <div class="seg">
+        <button id="rangeToday" class="on" type="button">Today</button>
+        <button id="rangeAll" type="button">All time</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="start" class="on" type="button">Start</button>
+  <button data-tab="results" type="button">Results</button>
+  <button data-tab="fix" type="button">Fix<span id="fixBadge"></span></button>
+  <button data-tab="setup" type="button">Setup</button>
+</nav>
+
+<dialog id="runDialog">
+  <form method="dialog" class="stack">
+    <div class="row"><span id="dlgBib" class="bib"></span><span id="dlgInfo" class="muted grow"></span></div>
+    <label class="muted" for="dlgSwap">Swap finish time with</label>
+    <div class="row">
+      <select id="dlgSwap"></select>
+      <button id="dlgSwapBtn" type="button">Swap</button>
+    </div>
+    <div class="row">
+      <button id="dlgDnf" type="button" class="grow">Mark DNF</button>
+      <button id="dlgUndo" type="button" class="grow">Back on course</button>
+    </div>
+    <button id="dlgCancel" type="button" class="danger">Delete run</button>
+    <button value="close">Close</button>
+  </form>
+</dialog>
+
+<div id="toast" class="toast"></div>
+
+<script type="module">
+// ===========================================================================
+// Settings (saved per phone)
+// ===========================================================================
+const LS = { url: 'rt.url', key: 'rt.key', demo: 'rt.demo', range: 'rt.range' };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+};
+
+// A shared link carries the connection in the URL hash: #url=...&key=...
+(function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('url') && h.get('key')) {
+    store.set(LS.url, h.get('url'));
+    store.set(LS.key, h.get('key'));
+    store.set(LS.demo, null);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+})();
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ===========================================================================
+// Formatting
+// ===========================================================================
+function fmtElapsed(us) {
+  if (us == null) return '';
+  const totalMs = Math.round(Number(us) / 1000);
+  const neg = totalMs < 0;
+  let ms = Math.abs(totalMs);
+  const h = Math.floor(ms / 3600000); ms -= h * 3600000;
+  const m = Math.floor(ms / 60000); ms -= m * 60000;
+  const s = Math.floor(ms / 1000); ms -= s * 1000;
+  const p2 = (n) => String(n).padStart(2, '0');
+  const body = h ? `${h}:${p2(m)}:${p2(s)}` : `${m}:${p2(s)}`;
+  return (neg ? '-' : '') + `${body}.${String(ms).padStart(3, '0')}`;
+}
+const fmtClock = (us) => us ? new Date(Number(us) / 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
+const fmtAgo = (iso) => {
+  const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  return s < 60 ? `${s}s ago` : `${Math.round(s / 60)} min ago`;
+};
+
+// ===========================================================================
+// Backends: Supabase (real) and Demo (in-memory, same behavior)
+// ===========================================================================
+function sinceIso() {
+  if (store.get(LS.range) === 'all') return '1970-01-01T00:00:00Z';
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+async function makeSupabaseBackend(url, key) {
+  const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+  const sb = createClient(url, key, { auth: { persistSession: false } });
+  const check = ({ data, error }) => { if (error) throw new Error(error.message); return data; };
+  return {
+    async load() {
+      const since = sinceIso();
+      const [runs, unassigned, status] = await Promise.all([
+        sb.from('run_results').select('*').gte('armed_at', since).order('armed_at').order('id'),
+        sb.from('unassigned_trips').select('*').gte('received_at', since).order('utc_us'),
+        sb.from('box_status').select('*'),
+      ]);
+      return { runs: check(runs), unassigned: check(unassigned), status: check(status) };
+    },
+    async arm(bib) { check(await sb.from('runs').insert({ bib })); },
+    async setStatus(id, status) { check(await sb.from('runs').update({ status }).eq('id', id)); },
+    async cancel(id) {
+      check(await sb.from('runs').update({ status: 'cancelled', start_trip_id: null, finish_trip_id: null }).eq('id', id));
+    },
+    async swap(a, b) { check(await sb.rpc('swap_finish', { run_a: a, run_b: b })); },
+    async assign(runId, tripId) { check(await sb.rpc('assign_trip', { p_run: runId, p_trip: tripId })); },
+    subscribe(cb) {
+      sb.channel('timing')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'runs' }, cb)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'trips' }, cb)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'box_status' }, cb)
+        .subscribe();
+    },
+  };
+}
+
+function makeDemoBackend() {
+  let tripId = 0, runId = 0;
+  const trips = [], runs = [];
+  let listener = () => {};
+  const nowUs = () => Date.now() * 1000;
+  const changed = () => setTimeout(listener, 0);
+
+  function pair(t) {
+    if (t.role === 'start') {
+      const r = runs.filter((r) => r.status === 'armed' && !r.start_trip_id)
+                    .sort((a, b) => a.armed_at.localeCompare(b.armed_at) || a.id - b.id)[0];
+      if (r) { r.start_trip_id = t.id; r.status = 'on_course'; }
+    } else {
+      const startOf = (r) => trips.find((x) => x.id === r.start_trip_id)?.utc_us ?? 0;
+      const r = runs.filter((r) => r.status === 'on_course' && !r.finish_trip_id && startOf(r) < t.utc_us)
+                    .sort((a, b) => startOf(a) - startOf(b) || a.id - b.id)[0];
+      if (r) { r.finish_trip_id = t.id; r.status = 'finished'; }
+    }
+  }
+  function view(r) {
+    const s = trips.find((x) => x.id === r.start_trip_id), f = trips.find((x) => x.id === r.finish_trip_id);
+    return { ...r, start_utc_us: s?.utc_us ?? null, finish_utc_us: f?.utc_us ?? null,
+             elapsed_us: s && f ? f.utc_us - s.utc_us : null, synced: !!(s?.synced && f?.synced) };
+  }
+  return {
+    demo: true,
+    async load() {
+      const claimed = new Set(runs.flatMap((r) => [r.start_trip_id, r.finish_trip_id]));
+      const seen = new Date().toISOString();
+      return {
+        runs: runs.map(view),
+        unassigned: trips.filter((t) => !claimed.has(t.id)),
+        status: [
+          { box_id: 'start-demo', role: 'start', gps_locked: true, sats: 9, pending: 0, last_seen: seen },
+          { box_id: 'finish-demo', role: 'finish', gps_locked: true, sats: 8, pending: 0, last_seen: seen },
+        ],
+      };
+    },
+    async arm(bib) { runs.push({ id: ++runId, bib, armed_at: new Date().toISOString(), status: 'armed',
+                                 start_trip_id: null, finish_trip_id: null }); changed(); },
+    async setStatus(id, status) { runs.find((r) => r.id === id).status = status; changed(); },
+    async cancel(id) { Object.assign(runs.find((r) => r.id === id),
+                         { status: 'cancelled', start_trip_id: null, finish_trip_id: null }); changed(); },
+    async swap(a, b) {
+      const ra = runs.find((r) => r.id === a), rb = runs.find((r) => r.id === b);
+      [ra.finish_trip_id, rb.finish_trip_id] = [rb.finish_trip_id, ra.finish_trip_id];
+      for (const r of [ra, rb]) r.status = r.finish_trip_id ? 'finished' : 'on_course';
+      changed();
+    },
+    async assign(runId, tid) {
+      const t = trips.find((x) => x.id === tid), field = t.role === 'start' ? 'start_trip_id' : 'finish_trip_id';
+      for (const r of runs) if (r[field] === tid) r[field] = null;
+      const r = runs.find((x) => x.id === runId);
+      r[field] = tid;
+      r.status = r.finish_trip_id ? 'finished' : 'on_course';
+      changed();
+    },
+    trip(role) {
+      const t = { id: ++tripId, role, utc_us: nowUs(), synced: true, received_at: new Date().toISOString() };
+      trips.push(t); pair(t); changed();
+    },
+    subscribe(cb) { listener = cb; },
+  };
+}
+
+// ===========================================================================
+// App state and rendering
+// ===========================================================================
+let api = null;
+let data = { runs: [], unassigned: [], status: [] };
+let resultsView = 'best';
+
+async function connect() {
+  const demo = store.get(LS.demo) === '1';
+  const url = store.get(LS.url), key = store.get(LS.key);
+  $('demoBanner').hidden = !demo;
+  $('demoCard').hidden = !demo;
+  $('cfgUrl').value = url || '';
+  $('cfgKey').value = key || '';
+  updateShareLink();
+  if (demo) {
+    api = makeDemoBackend();
+  } else if (url && key) {
+    try { api = await makeSupabaseBackend(url, key); }
+    catch (e) { api = null; toast('Could not load Supabase: ' + e.message); }
+  } else {
+    api = null;
+    showTab('setup');
+    toast('Add your Supabase details, or try the demo.');
+  }
+  if (api) { api.subscribe(() => refresh()); await refresh(); }
+  else render();
+}
+
+let refreshing = false, again = false;
+async function refresh() {
+  if (!api) return;
+  if (refreshing) { again = true; return; }
+  refreshing = true;
+  try { data = await api.load(); render(); }
+  catch (e) { toast('Load failed: ' + e.message); }
+  finally { refreshing = false; if (again) { again = false; refresh(); } }
+}
+
+function boxPill(el, role) {
+  const s = data.status.filter((x) => x.role === role)
+                       .sort((a, b) => b.last_seen.localeCompare(a.last_seen))[0];
+  const label = role === 'start' ? 'Start' : 'Finish';
+  el.className = 'pill';
+  if (!s) { el.textContent = `${label}: no signal yet`; el.classList.add('bad'); return; }
+  const age = (Date.now() - new Date(s.last_seen).getTime()) / 1000;
+  if (age > 45) { el.textContent = `${label}: offline (${fmtAgo(s.last_seen)})`; el.classList.add('bad'); }
+  else if (!s.gps_locked) { el.textContent = `${label}: no GPS lock`; el.classList.add('warn'); }
+  else { el.textContent = `${label}: ready, ${s.sats} sats` + (s.pending ? `, ${s.pending} queued` : ''); el.classList.add('good'); }
+}
+
+function li(html) { return `<li>${html}</li>`; }
+function emptyLi(text) { return `<li class="empty">${esc(text)}</li>`; }
+
+function render() {
+  boxPill($('pillStart'), 'start');
+  boxPill($('pillFinish'), 'finish');
+
+  const runs = data.runs.filter((r) => r.status !== 'cancelled');
+  const armed = runs.filter((r) => r.status === 'armed');
+  const course = runs.filter((r) => r.status === 'on_course')
+                     .sort((a, b) => (a.start_utc_us ?? 0) - (b.start_utc_us ?? 0));
+  const finished = runs.filter((r) => r.status === 'finished' && r.elapsed_us != null);
+
+  // Start tab
+  $('armedList').innerHTML = armed.length
+    ? armed.map((r, i) => li(`<span class="bib">${esc(r.bib)}</span>
+        <span class="grow muted">${i === 0 ? 'Next through the beam' : `In line, #${i + 1}`}</span>
+        <button class="small danger" data-cancel="${r.id}">Remove</button>`)).join('')
+    : emptyLi('Nobody armed. Type a bib above.');
+  $('courseList').innerHTML = course.length
+    ? course.map((r) => li(`<span class="bib">${esc(r.bib)}</span>
+        <span class="grow"><span class="time" data-since="${r.start_utc_us ?? ''}"></span>
+        <span class="muted"> started ${fmtClock(r.start_utc_us)}</span></span>
+        <button class="small" data-dnf="${r.id}">DNF</button>`)).join('')
+    : emptyLi('Nobody on course.');
+  const recent = finished.slice().sort((a, b) => (b.finish_utc_us ?? 0) - (a.finish_utc_us ?? 0)).slice(0, 4);
+  $('recentList').innerHTML = recent.length
+    ? recent.map((r) => li(`<span class="bib">${esc(r.bib)}</span>
+        <span class="grow time">${fmtElapsed(r.elapsed_us)}${r.synced ? '' : ' <span class="flag">GPS?</span>'}</span>
+        <span class="muted">${fmtClock(r.finish_utc_us)}</span>`)).join('')
+    : emptyLi('No finishes yet.');
+  tickClocks();
+
+  // Results tab
+  let rows = finished.slice().sort((a, b) => a.elapsed_us - b.elapsed_us);
+  if (resultsView === 'best') {
+    const seen = new Set();
+    rows = rows.filter((r) => !seen.has(r.bib) && seen.add(r.bib));
+  }
+  const dnfs = runs.filter((r) => r.status === 'dnf');
+  $('resultsBody').innerHTML = rows.map((r, i) => `<tr data-run="${r.id}">
+      <td>${i + 1}</td><td class="bib">${esc(r.bib)}</td>
+      <td class="num time">${fmtElapsed(r.elapsed_us)}</td>
+      <td>${r.synced ? '' : '<span class="flag">GPS?</span>'}</td></tr>`).join('')
+    + dnfs.map((r) => `<tr data-run="${r.id}"><td></td><td class="bib">${esc(r.bib)}</td>
+      <td class="num muted">DNF</td><td></td></tr>`).join('')
+    || `<tr><td colspan="4" class="empty">No results yet.</td></tr>`;
+
+  // Fix tab
+  const needStart = runs.filter((r) => !r.start_trip_id);
+  const needFinish = runs.filter((r) => r.start_trip_id && !r.finish_trip_id);
+  $('unassignedList').innerHTML = data.unassigned.length
+    ? data.unassigned.map((t) => {
+        const choices = (t.role === 'start' ? needStart : needFinish)
+          .map((r) => `<option value="${r.id}">Bib ${esc(r.bib)}</option>`).join('');
+        return li(`<span class="grow"><b>${t.role === 'start' ? 'Start' : 'Finish'}</b>
+            <span class="muted">${fmtClock(t.utc_us)}${t.synced ? '' : ', no GPS'}</span></span>
+          ${choices ? `<select data-trip-sel="${t.id}" style="width:auto">${choices}</select>
+          <button class="small primary" data-assign="${t.id}">Attach</button>`
+                    : '<span class="muted">Arm the bib on Start first</span>'}`);
+      }).join('')
+    : emptyLi('Nothing to fix.');
+  $('fixBadge').textContent = data.unassigned.length ? ` (${data.unassigned.length})` : '';
+}
+
+function tickClocks() {
+  const now = Date.now() * 1000;
+  document.querySelectorAll('[data-since]').forEach((el) => {
+    const s = Number(el.dataset.since);
+    el.textContent = s ? fmtElapsed(Math.max(0, now - s)).replace(/\.\d+$/, '') : '';
+  });
+}
+setInterval(tickClocks, 500);
+setInterval(() => { if (api && !api.demo) refresh(); else render(); }, 10000);
+
+// ===========================================================================
+// Actions
+// ===========================================================================
+async function act(fn, ok) {
+  try { await fn(); if (ok) toast(ok); await refresh(); }
+  catch (e) { toast('Failed: ' + e.message); }
+}
+
+$('armForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const bib = $('bibInput').value.trim();
+  if (!bib || !api) return;
+  $('bibInput').value = '';
+  act(() => api.arm(bib), `Bib ${bib} armed`);
+  $('bibInput').focus();
+});
+
+document.body.addEventListener('click', (e) => {
+  const b = e.target.closest('button, tr[data-run]');
+  if (!b || !api) return;
+  if (b.dataset.cancel) act(() => api.cancel(Number(b.dataset.cancel)), 'Removed');
+  if (b.dataset.dnf && confirm('Mark this rider DNF?')) act(() => api.setStatus(Number(b.dataset.dnf), 'dnf'), 'Marked DNF');
+  if (b.dataset.assign) {
+    const sel = document.querySelector(`[data-trip-sel="${b.dataset.assign}"]`);
+    act(() => api.assign(Number(sel.value), Number(b.dataset.assign)), 'Attached');
+  }
+  if (b.dataset.run) openRun(Number(b.dataset.run));
+});
+
+let dlgRun = null;
+function openRun(id) {
+  const r = data.runs.find((x) => x.id === id);
+  if (!r) return;
+  dlgRun = r;
+  $('dlgBib').textContent = r.bib;
+  $('dlgInfo').textContent = r.status === 'dnf' ? 'DNF' : fmtElapsed(r.elapsed_us);
+  const others = data.runs.filter((x) => x.id !== r.id && (x.status === 'finished' || x.status === 'on_course'));
+  $('dlgSwap').innerHTML = others.map((x) =>
+    `<option value="${x.id}">Bib ${esc(x.bib)} ${x.elapsed_us != null ? fmtElapsed(x.elapsed_us) : '(on course)'}</option>`).join('');
+  $('dlgSwapBtn').disabled = !others.length;
+  $('dlgDnf').hidden = r.status === 'dnf';
+  $('dlgUndo').hidden = r.status !== 'dnf';
+  $('runDialog').showModal();
+}
+$('dlgSwapBtn').onclick = () => { const o = Number($('dlgSwap').value); $('runDialog').close();
+  act(() => api.swap(dlgRun.id, o), 'Finish times swapped'); };
+$('dlgDnf').onclick = () => { $('runDialog').close(); act(() => api.setStatus(dlgRun.id, 'dnf'), 'Marked DNF'); };
+$('dlgUndo').onclick = () => { $('runDialog').close();
+  act(() => api.setStatus(dlgRun.id, dlgRun.finish_trip_id ? 'finished' : 'on_course'), 'Restored'); };
+$('dlgCancel').onclick = () => { if (!confirm('Delete this run? Its beam trips go back to Fix.')) return;
+  $('runDialog').close(); act(() => api.cancel(dlgRun.id), 'Run deleted'); };
+
+$('viewBest').onclick = () => { resultsView = 'best'; $('viewBest').classList.add('on'); $('viewAll').classList.remove('on'); render(); };
+$('viewAll').onclick = () => { resultsView = 'all'; $('viewAll').classList.add('on'); $('viewBest').classList.remove('on'); render(); };
+
+$('exportCsv').onclick = () => {
+  const lines = [['bib', 'status', 'time', 'elapsed_ms', 'start_utc', 'finish_utc', 'gps_synced']];
+  for (const r of data.runs.filter((x) => x.status !== 'cancelled')) {
+    lines.push([r.bib, r.status, fmtElapsed(r.elapsed_us), r.elapsed_us == null ? '' : Math.round(r.elapsed_us / 1000),
+      r.start_utc_us ? new Date(r.start_utc_us / 1000).toISOString() : '',
+      r.finish_utc_us ? new Date(r.finish_utc_us / 1000).toISOString() : '', r.synced]);
+  }
+  const csv = lines.map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `results-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+};
+
+if (location.search.includes('demo')) store.set(LS.demo, '1');
+$('fakeStart').onclick = () => api?.trip?.('start');
+$('fakeFinish').onclick = () => api?.trip?.('finish');
+
+// Setup
+function updateShareLink() {
+  const url = store.get(LS.url), key = store.get(LS.key);
+  $('shareLink').textContent = url && key
+    ? `${location.origin}${location.pathname}#url=${encodeURIComponent(url)}&key=${encodeURIComponent(key)}`
+    : 'Save a connection first.';
+}
+$('saveCfg').onclick = () => {
+  const url = $('cfgUrl').value.trim().replace(/\/+$/, ''), key = $('cfgKey').value.trim();
+  if (!/^https:\/\/.+/.test(url)) return toast('URL should start with https://');
+  if (key.startsWith('sb_secret_')) return toast('That is the secret key. Use the publishable key.');
+  store.set(LS.url, url); store.set(LS.key, key); store.set(LS.demo, null);
+  location.href = location.pathname;
+};
+$('demoBtn').onclick = () => { store.set(LS.demo, '1'); location.href = location.pathname; };
+$('copyLink').onclick = async () => {
+  try { await navigator.clipboard.writeText($('shareLink').textContent); toast('Link copied'); }
+  catch { toast('Copy failed. Long-press the link to copy it.'); }
+};
+const setRange = (r) => { store.set(LS.range, r); $('rangeToday').classList.toggle('on', r !== 'all');
+  $('rangeAll').classList.toggle('on', r === 'all'); refresh(); };
+$('rangeToday').onclick = () => setRange('today');
+$('rangeAll').onclick = () => setRange('all');
+setRange(store.get(LS.range) === 'all' ? 'all' : 'today');
+
+// Tabs
+function showTab(name) {
+  document.querySelectorAll('section').forEach((s) => s.classList.toggle('active', s.id === `tab-${name}`));
+  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+}
+document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+connect();
+</script>
+</body>
+</html>
